@@ -1,6 +1,6 @@
 ﻿using System.IO;
 
-namespace Mordor.Process
+namespace Mordor.Process 
 {
     public sealed class ConsoleReader : TextReader
     {

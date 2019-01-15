@@ -5,8 +5,6 @@ VisualStudioVersion = 16.0.28407.52
 MinimumVisualStudioVersion = 15.0.26124.0
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{793933BE-72CF-49A9-BB0E-37AC683D20F1}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Mordor", "src\Mordor.Process\Mordor.Process.csproj", "{FD11F5FC-AE8F-40BA-A399-A09196526DCE}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleApp1", "src\ConsoleApp1\ConsoleApp1.csproj", "{A70A2747-32ED-447C-8682-6ECADD7792D1}"
 EndProject
 Global

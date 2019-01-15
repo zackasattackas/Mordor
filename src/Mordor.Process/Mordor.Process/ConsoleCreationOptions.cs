@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Mordor.Process
+namespace Mordor.Process 
 {
     public sealed class ConsoleCreationOptions
     {

@@ -1,10 +1,11 @@
 ﻿using System;
 
-namespace Mordor.Process.Internal
+namespace Mordor.Process
 {
     [Flags]
-    internal enum ProcessCreationFlags : uint
+    public enum ProcessCreationFlags : uint
     {
+        None = 0x00000000,
         BreakawayFromJob = 0x01000000,
         DefaultErrorMode = 0x04000000,
         NewConsole = 0x00000010,

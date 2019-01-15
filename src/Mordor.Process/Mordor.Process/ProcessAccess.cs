@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Mordor.Process
+namespace Mordor.Process 
 {
     [Flags]
     public enum ProcessAccess : uint

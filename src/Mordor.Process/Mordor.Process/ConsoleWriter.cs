@@ -1,7 +1,7 @@
 ﻿using System.IO;
 using System.Text;
 
-namespace Mordor.Process
+namespace Mordor.Process 
 {
     public sealed class ConsoleWriter : TextWriter
     {

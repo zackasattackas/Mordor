@@ -66,7 +66,7 @@ namespace Mordor.Process.Internal
                 throw new AbandonedMutexException((int) result - (int) WaitResult.Abandoned, null);
         }
 
-        public static unsafe IEnumerable<string> GetProcessModuleNames(Mordor.Process process)
+        public static unsafe IEnumerable<string> GetProcessModuleNames(Process process)
         {
             var modules = new IntPtr[1024];
             int count;
@@ -75,7 +75,7 @@ namespace Mordor.Process.Internal
             {
                 var size = (uint) (sizeof(IntPtr) * modules.Length);
 
-                if (!NativeMethods.EnumProcessModules(process.SafeHandle, p0, size, out var needed))
+                if (!NativeMethods.EnumProcessModules(process.SafeProcessHandle, p0, size, out var needed))
                     ThrowLastWin32Exception();
 
                 count = (int) needed / sizeof(IntPtr);
@@ -84,7 +84,7 @@ namespace Mordor.Process.Internal
                 {
                     Array.Resize(ref modules, count);
 
-                    if (!NativeMethods.EnumProcessModules(process.SafeHandle, p0, size, out _))
+                    if (!NativeMethods.EnumProcessModules(process.SafeProcessHandle, p0, size, out _))
                         ThrowLastWin32Exception();
                 }
             }
