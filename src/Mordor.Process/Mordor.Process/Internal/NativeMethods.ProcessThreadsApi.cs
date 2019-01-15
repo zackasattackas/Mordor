@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+
 // ReSharper disable InconsistentNaming
 
 namespace Mordor.Process.Internal
 {
-    internal sealed partial class NativeMethods
+    internal static unsafe partial class NativeMethods
     {
         [Flags]
         internal enum StartupFlags : uint
@@ -35,9 +37,9 @@ namespace Mordor.Process.Internal
         internal unsafe struct STARTUP_INFO
         {
             public uint cb;
-            [MarshalAs(UnmanagedType.LPStr)] public char* lpReserved;
-            [MarshalAs(UnmanagedType.LPStr)] public char* lpDesktop;
-            [MarshalAs(UnmanagedType.LPStr)] public char* lpTitle;
+            public char* lpReserved;
+            public char* lpDesktop;
+            public char* lpTitle;
             public uint dwX;
             public uint dwY;
             public uint dwXSize;
@@ -49,9 +51,9 @@ namespace Mordor.Process.Internal
             public ShowWindowOptions wShowWindow;
             public ushort cbReserved2;
             public byte* lpReserved2;
-            public IntPtr hStdInput;
-            public IntPtr hStdOutput;
-            public IntPtr hStdError;
+            public int hStdInput;
+            public int hStdOutput;
+            public int hStdError;
 
             internal static uint SizeOf()
             {
@@ -64,5 +66,16 @@ namespace Mordor.Process.Internal
                 return lpTitle->ToString();
             }
         }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern bool GetProcessInformation(SafeProcessHandle handle, ProcessInfo infoClass, void* info, uint size);
+    }
+
+    internal enum ProcessInfo : uint
+    {
+        Default = Basic,
+        Basic = 0,
+        Wow64 = 26,
+        ImageFileName = 27,
     }
 }

@@ -1,4 +1,5 @@
 ﻿using System;
+using Microsoft.Win32.SafeHandles;
 using Mordor.Process.Internal;
 using static Mordor.Process.Internal.NativeHelpers;
 using static Mordor.Process.Internal.NativeMethods;
@@ -29,14 +30,14 @@ namespace Mordor.Process
             return processes;
         }
 
-        public static Process OpenProcess(uint pid, ProcessAccess access, bool inherit)
+        public static SafeProcessHandle OpenProcess(uint pid, ProcessAccess access, bool inherit)
         {            
-            return new Process(NativeMethods.OpenProcess(access, inherit, pid));
+            return NativeMethods.OpenProcess(access, inherit, pid);
         }
 
-        public static Process [] OpenProcesses(uint[] pids, ProcessAccess access, bool inherit)
+        public static SafeProcessHandle[] OpenProcesses(uint[] pids, ProcessAccess access, bool inherit)
         {
-            var processes = new Process [pids.Length];
+            var processes = new SafeProcessHandle[pids.Length];
 
             for (var i = 0; i < pids.Length; i++)
                 processes[i] = OpenProcess(pids[i], access, inherit);
@@ -44,19 +45,37 @@ namespace Mordor.Process
             return processes;
         }
 
-        public static void TerminateProcess(Process process)
-        {
-            TerminateProcess(process.Pid);
-        }
+        //public static void TerminateProcess(Process process)
+        //{
+        //    TerminateProcess(process.Pid);
+        //}
 
         public static void TerminateProcess(uint pid)
         {
             throw new NotImplementedException();
         }
 
-        public static void WaitForInputIdle(Process process, TimeSpan timeout)
+        //public static void WaitForInputIdle(Process process, TimeSpan timeout)
+        //{
+        //    throw new NotImplementedException();
+        //}
+
+        public static unsafe string GetProcessFileName(SafeProcessHandle handle)
         {
-            throw new NotImplementedException();
+            var fileName = stackalloc char[MAX_PATH];
+
+            if (!GetProcessInformation(handle, ProcessInfo.ImageFileName, (void*) fileName, sizeof(char) * MAX_PATH))
+                ThrowLastWin32Exception();
+
+            return new string(fileName);
+        }
+
+        public static bool IsWow64Process(SafeProcessHandle handle)
+        {
+            if (!IsWOW64Process2(handle, out var processMachine, out _))
+                ThrowLastWin32Exception();
+
+            return processMachine != IMAGE_FILE_MACHINE_UNKNOWN;
         }
     }
 }

@@ -4,7 +4,7 @@ using Microsoft.Win32.SafeHandles;
 
 namespace Mordor.Process.Internal
 {
-    internal sealed unsafe partial class NativeMethods
+    internal static unsafe partial class NativeMethods
     {
         [DllImport("Psapi.dll", SetLastError = true)]
         public static extern bool EnumProcesses(uint* lpidProcess, uint cb, uint* lpcbNeeded);

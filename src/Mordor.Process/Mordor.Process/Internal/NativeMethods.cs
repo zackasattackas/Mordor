@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 namespace Mordor.Process.Internal
 {
     [SuppressMessage("ReSharper", "InconsistentNaming")]
-    internal sealed partial class NativeMethods
+    internal static partial class NativeMethods
     {
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
         internal struct SECURITY_ATTRIBUTES

@@ -8,13 +8,15 @@ using System.Threading;
 
 namespace Mordor.Process.Internal
 {
-    internal sealed class NativeHelpers
+    internal static class NativeHelpers
     {
         public static void WaitOne(SafeHandle handle, TimeSpan timeout)
         {
             ThrowInvalidHandleException(handle);
 
-            EnsureSuccessWaitResult(NativeMethods.WaitForSingleObject(handle, (WaitTimeout) timeout));
+            var result = NativeMethods.WaitForSingleObject(handle, (WaitTimeout) timeout);
+
+            EnsureSuccessWaitResult(result);
         }
 
         public static unsafe int WaitAny(TimeSpan timeout, params SafeHandle[] handles)
@@ -27,7 +29,7 @@ namespace Mordor.Process.Internal
             var ptrs = handles.Select(h => h.DangerousGetHandle()).ToArray();
             uint result;
 
-            fixed (IntPtr* p0 = &ptrs[0])
+            fixed (IntPtr* p0 = ptrs)
                 result = NativeMethods.WaitForMultipleObjects(handles.Length, p0, false, (WaitTimeout) timeout);
 
             EnsureSuccessWaitResult(result);
@@ -43,18 +45,18 @@ namespace Mordor.Process.Internal
             var ptrs = handles.Select(h => h.DangerousGetHandle()).ToArray();
             uint result;
 
-            fixed (IntPtr* p0 = &ptrs[0])
+            fixed (IntPtr* p0 = ptrs)
                 result = NativeMethods.WaitForMultipleObjects(handles.Length, p0, true, (WaitTimeout) timeout);
 
             EnsureSuccessWaitResult(result);
         }
 
-        public static void EnsureSuccessWaitResult(WaitResult result)
+        private static void EnsureSuccessWaitResult(WaitResult result)
         {
             EnsureSuccessWaitResult((uint) result);
         }
 
-        public static void EnsureSuccessWaitResult(uint result)
+        private static void EnsureSuccessWaitResult(uint result)
         {
             if (result == unchecked((uint) WaitResult.Failed))
                 ThrowLastWin32Exception();
@@ -71,7 +73,7 @@ namespace Mordor.Process.Internal
             var modules = new IntPtr[1024];
             int count;
 
-            fixed (IntPtr* p0 = &modules[0])
+            fixed (IntPtr* p0 = modules)
             {
                 var size = (uint) (sizeof(IntPtr) * modules.Length);
 
@@ -107,7 +109,7 @@ namespace Mordor.Process.Internal
             throw new Win32Exception(Marshal.GetLastWin32Error());
         }
 
-        public static void ThrowInvalidHandleException(SafeHandle handle)
+        internal static void ThrowInvalidHandleException(SafeHandle handle)
         {
             if (!handle.IsInvalid)
                 return;

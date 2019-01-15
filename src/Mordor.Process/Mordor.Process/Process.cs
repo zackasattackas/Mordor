@@ -1,31 +1,46 @@
 ﻿using System;
 using System.ComponentModel;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
 using Mordor.Process.Internal;
+using static Mordor.Process.Internal.NativeMethods;
+using static Mordor.Process.Internal.NativeHelpers;
 
 namespace Mordor.Process
 {
     public class Process : Component, ISafeDisposable
     {
+        private int? _exitCode;
+        private CancellationToken _cancellation;
+
         #region Properties
 
         public bool IsDisposed { get; private set; }
-        public SafeProcessHandle SafeProcessHandle { get; set; }
-        public SafeProcessHandle SafeThreadHandle { get; set; }
+        public SafeProcessHandle SafeProcessHandle { get; }
+        public SafeProcessHandle SafeThreadHandle { get; }
         public uint Pid { get; }
 
-        public WaitHandle WaitHandle
+        public int ExitCode
         {
             get
             {
-                var waitHandle = new ManualResetEvent(false);
-                waitHandle.SetSafeWaitHandle(new SafeWaitHandle(SafeProcessHandle.DangerousGetHandle(), true));
-                return waitHandle;
+                if (_exitCode == default)
+                {
+                    if (!GetExitCodeProcess(SafeProcessHandle, out var exitCode))
+                        ThrowLastWin32Exception();
+
+                    _exitCode = exitCode;
+                }
+
+                return _exitCode.Value;
             }
         }
+
+        public WaitHandle WaitHandle => SafeProcessHandle.GetWaitHandle<ManualResetEvent>(true);
 
         #endregion
 
@@ -35,20 +50,22 @@ namespace Mordor.Process
 
         #endregion
 
-        #region Ctor
+        #region Ctor        
 
-        internal Process(NativeMethods.PROCESS_INFORMATION info)
+        internal Process(PROCESS_INFORMATION info, CancellationToken cancellationToken = default)
         {
+            _cancellation = cancellationToken;
             Pid = info.Pid;
             SafeProcessHandle = new SafeProcessHandle(info.Process, true);
-            SafeThreadHandle = new SafeProcessHandle(info.Thread, true);            
+            SafeThreadHandle = new SafeProcessHandle(info.Thread, true);
         }
 
-        public Process(SafeProcessHandle handle)
-            
+        public Process(SafeProcessHandle handle, CancellationToken cancellationToken = default)
+
         {
+            _cancellation = cancellationToken;
             SafeProcessHandle = handle;
-            throw new NotImplementedException();            
+            throw new NotImplementedException();
         }
 
         #endregion
@@ -88,9 +105,31 @@ namespace Mordor.Process
             throw new NotImplementedException();
         }
 
-        public void WaitOne(TimeSpan timeout = default)
+        /// <summary>
+        /// Waits for the process to exit.
+        /// </summary>
+        /// <returns>Returns the process exit code.</returns>
+        public int Wait() => Wait(Timeout.InfiniteTimeSpan);
+
+        /// <summary>
+        /// Waits for the process to exit or for the timeout limit to be reached.
+        /// </summary>
+        /// <param name="timeout">The maximum time to wait for the process to exit.</param>
+        /// <returns>Returns the process exit code.</returns>
+        public int Wait(TimeSpan timeout)
         {
+#if DEBUG
+            NativeHelpers.WaitOne(SafeProcessHandle, timeout);
+#elif SAFEPROCESSHANDLE
             WaitHandle.WaitOne(timeout);
+#endif
+
+            return ExitCode;
+        }
+
+        public TaskAwaiter<(Process Process, int ExitCode)> GetAwaiter()
+        {
+            return Task.Run(() => (this, Wait())).GetAwaiter();
         }
 
         #endregion

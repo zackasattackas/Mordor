@@ -5,7 +5,7 @@ using static Mordor.Process.Internal.NativeMethods;
 
 namespace Mordor.Process
 {
-    public class StartupInfo
+    public class ProcessStartup
     {
         #region Fields
 
@@ -41,7 +41,7 @@ namespace Mordor.Process
 
         #region Ctor
 
-        public StartupInfo(params string[] commandLine)
+        public ProcessStartup(params string[] commandLine)
         {
             CommandLine = commandLine;
         }
@@ -50,22 +50,31 @@ namespace Mordor.Process
 
         #region Public methods        
 
-        public StartupInfo SetStdInput(FileStream stream)
+        public ProcessStartup SetStdInput(FileStream stream)
         {
             StdInput = stream;
             return this;
         }
 
-        public StartupInfo SetStdOutput(FileStream stream)
+        public ProcessStartup SetStdOutput(FileStream stream)
         {
             StdOutput = stream;
             return this;
         }
 
-        public StartupInfo SetStdError(FileStream stream)
+        public ProcessStartup SetStdError(FileStream stream)
         {
             StdError = stream;
             return this;
+        }
+
+        #endregion
+
+        #region Public static methods
+
+        public static string Escape(string value)
+        {
+            return '"' + value + '"';
         }
 
         #endregion
