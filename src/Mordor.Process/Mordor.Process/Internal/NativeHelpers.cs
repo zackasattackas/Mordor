@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using static Mordor.Process.Internal.NativeMethods;
 
 namespace Mordor.Process.Internal
 {
@@ -14,9 +15,7 @@ namespace Mordor.Process.Internal
         {
             ThrowInvalidHandleException(handle);
 
-            var result = NativeMethods.WaitForSingleObject(handle, (WaitTimeout) timeout);
-
-            EnsureSuccessWaitResult(result);
+            EnsureSuccessWaitResult(WaitForSingleObject(handle, (WaitTimeout)timeout));
         }
 
         public static unsafe int WaitAny(TimeSpan timeout, params SafeHandle[] handles)
@@ -30,7 +29,7 @@ namespace Mordor.Process.Internal
             uint result;
 
             fixed (IntPtr* p0 = ptrs)
-                result = NativeMethods.WaitForMultipleObjects(handles.Length, p0, false, (WaitTimeout) timeout);
+                result = WaitForMultipleObjects(handles.Length, p0, false, (WaitTimeout) timeout);
 
             EnsureSuccessWaitResult(result);
 
@@ -46,7 +45,7 @@ namespace Mordor.Process.Internal
             uint result;
 
             fixed (IntPtr* p0 = ptrs)
-                result = NativeMethods.WaitForMultipleObjects(handles.Length, p0, true, (WaitTimeout) timeout);
+                result = WaitForMultipleObjects(handles.Length, p0, true, (WaitTimeout) timeout);
 
             EnsureSuccessWaitResult(result);
         }
@@ -64,7 +63,7 @@ namespace Mordor.Process.Internal
             if (result == (int) WaitResult.TimedOut)
                 throw new TimeoutException("The wait operation timed out.");
 
-            if (result >= NativeMethods.MAXIMUM_WAIT_OBJECTS)
+            if (result >= MAXIMUM_WAIT_OBJECTS)
                 throw new AbandonedMutexException((int) result - (int) WaitResult.Abandoned, null);
         }
 
@@ -77,7 +76,7 @@ namespace Mordor.Process.Internal
             {
                 var size = (uint) (sizeof(IntPtr) * modules.Length);
 
-                if (!NativeMethods.EnumProcessModules(process.SafeProcessHandle, p0, size, out var needed))
+                if (!EnumProcessModules(process.SafeProcessHandle, p0, size, out var needed))
                     ThrowLastWin32Exception();
 
                 count = (int) needed / sizeof(IntPtr);
@@ -86,7 +85,7 @@ namespace Mordor.Process.Internal
                 {
                     Array.Resize(ref modules, count);
 
-                    if (!NativeMethods.EnumProcessModules(process.SafeProcessHandle, p0, size, out _))
+                    if (!EnumProcessModules(process.SafeProcessHandle, p0, size, out _))
                         ThrowLastWin32Exception();
                 }
             }
@@ -95,8 +94,8 @@ namespace Mordor.Process.Internal
 
             for (var i = 0; i < modules.Length; i++)
             {
-                var fileName = new StringBuilder(NativeMethods.MAX_PATH);
-                var result = NativeMethods.GetModuleFileName(modules[i], fileName, NativeMethods.MAX_PATH);
+                var fileName = new StringBuilder(MAX_PATH);
+                var result = GetModuleFileName(modules[i], fileName, MAX_PATH);
 
                 fileNames[i] = result.ToString();
             }
@@ -120,9 +119,9 @@ namespace Mordor.Process.Internal
         // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Local
         private static void ThrowIfHandleCountOutOfRange(int count)
         {
-            if (count > NativeMethods.MAXIMUM_WAIT_OBJECTS)
+            if (count > MAXIMUM_WAIT_OBJECTS)
                 throw new ArgumentOutOfRangeException("The maximum number of objects that can be waited on is " +
-                                                      NativeMethods.MAXIMUM_WAIT_OBJECTS + ".");
+                                                      MAXIMUM_WAIT_OBJECTS + ".");
         }
     }
 }
