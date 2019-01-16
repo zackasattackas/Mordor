@@ -13,27 +13,54 @@ using static Mordor.Process.Internal.NativeMethods;
 
 namespace Mordor.Process
 {
-    public class Process : Component, ISafeDisposable
+    public class Process : Component, IDisposable
     {
         #region Fields
 
         private int? _exitCode;
         private readonly CancellationToken _cancellation;
         private readonly ProcessStartup _startup;
+        private readonly uint _pid;
+        private readonly SafeProcessHandle _safeProcessHandle;
+        private readonly SafeProcessHandle _safeThreadHandle;
+        private bool _disposed;
 
         #endregion
 
         #region Properties
 
-        public bool IsDisposed { get; private set; }
-        public SafeProcessHandle SafeProcessHandle { get; }
-        public SafeProcessHandle SafeThreadHandle { get; }
-        public uint Pid { get; }
+        public SafeProcessHandle SafeProcessHandle
+        {
+            get
+            {
+                ThrowIfDisposed();
+                return _safeProcessHandle;
+            }
+        }
+
+        public SafeProcessHandle SafeThreadHandle
+        {
+            get
+            {
+                ThrowIfDisposed();
+                return _safeThreadHandle;
+            }
+        }
+
+        public uint Pid
+        {
+            get
+            {
+                ThrowIfDisposed();
+                return _pid;
+            }
+        }
 
         public int ExitCode
         {
             get
             {
+                ThrowIfDisposed();
                 if (_exitCode == default)
                 {
                     if (!GetExitCodeProcess(SafeProcessHandle, out var exitCode))
@@ -46,13 +73,42 @@ namespace Mordor.Process
             }
         }
 
-        public WaitHandle WaitHandle => SafeProcessHandle.GetWaitHandle<ManualResetEvent>(true);
+        public WaitHandle WaitHandle
+        {
+            get
+            {
+                ThrowIfDisposed();
+                return SafeProcessHandle.GetWaitHandle<ManualResetEvent>(true);
+            }
+        }
 
         #endregion
 
         #region Static properties
 
+        [ThreadStatic] private static Process _currentProcess;
+
+        [ThreadStatic] private static ProcessStartup _currentStartup;
+
+        public static Process CurrentProcess =>
+            _currentProcess ?? (_currentProcess = new Process(GetCurrentProcessId(), GetCurrentProcess(), GetCurrentThread()));
+
+        public static ProcessStartup CurrentProcessStartup
+        {
+            get
+            {
+                if (_currentStartup is null)
+                {
+                    GetStartupInfo(out var startup);
+                    _currentStartup = new ProcessStartup(startup);
+                }
+
+                return _currentStartup;
+            }
+        }
+
         public static ProcessFactory Factory => new ProcessFactory();
+
         public static CimInstanceQuery<ProcessInfo> AllProcesses { get; }
 
         #endregion
@@ -63,18 +119,18 @@ namespace Mordor.Process
         {
             _cancellation = cancellationToken;
             _startup = startup;
-
-            Pid = info.Pid;
-            SafeProcessHandle = new SafeProcessHandle(info.Process, true);
-            SafeThreadHandle = new SafeProcessHandle(info.Thread, true);
+            _pid = info.Pid;
+            _safeProcessHandle = new SafeProcessHandle(info.Process, true);
+            _safeThreadHandle = new SafeProcessHandle(info.Thread, true);
         }
 
-        public Process(SafeProcessHandle handle, CancellationToken cancellationToken = default)
+        public Process(uint pid, SafeProcessHandle handle, SafeProcessHandle thread, CancellationToken cancellationToken = default)
 
         {
             _cancellation = cancellationToken;
-            SafeProcessHandle = handle;
-            throw new NotImplementedException();
+            _pid = pid;
+            _safeProcessHandle = handle;
+            _safeThreadHandle = thread;
         }
 
         #endregion
@@ -85,11 +141,12 @@ namespace Mordor.Process
         {
             if (disposing)
             {
-                SafeProcessHandle?.Dispose();
-                IsDisposed = true;
+                SafeProcessHandle.Dispose();
+                SafeThreadHandle.Dispose();
             }
 
             base.Dispose(disposing);
+            _disposed = true;
         }
 
         #endregion
@@ -109,6 +166,7 @@ namespace Mordor.Process
         /// <returns>Returns the process exit code.</returns>
         public int Wait(TimeSpan timeout)
         {
+            ThrowIfDisposed();
 #if DEBUG
             WaitOne(SafeProcessHandle, timeout);
 #elif SAFEPROCESSHANDLE
@@ -120,6 +178,7 @@ namespace Mordor.Process
 
         public TaskAwaiter<(Process Process, int ExitCode)> GetAwaiter()
         {
+            ThrowIfDisposed();
             if ((_startup.CreationFlags & ProcessCreationFlags.Suspended) != 0)
                 ResumeProcess(this);
             return Task.Run(() => (this, Wait()), _cancellation).GetAwaiter();
@@ -137,7 +196,7 @@ namespace Mordor.Process
         public static int WaitAny(TimeSpan timeout, params Process[] processes)
         {
             return NativeHelpers.WaitAny(timeout, processes.Select(p => p.SafeProcessHandle).Cast<SafeHandle>().ToArray());
-        }
+        }        
 
         public static unsafe uint[] GetProcesses()
         {
@@ -189,16 +248,6 @@ namespace Mordor.Process
                 ThrowLastWin32Exception();
         }
 
-        //public static unsafe string GetProcessFileName(SafeProcessHandle handle)
-        //{
-        //    var fileName = stackalloc char[MAX_PATH];
-
-        //    if (!GetProcessInformation(handle, ProcessInfo.ImageFileName, (void*)fileName, sizeof(char) * MAX_PATH))
-        //        ThrowLastWin32Exception();
-
-        //    return new string(fileName);
-        //}
-
 
         #endregion
 
@@ -206,7 +255,7 @@ namespace Mordor.Process
 
         private void ThrowIfDisposed()
         {
-            if (!IsDisposed)
+            if (!_disposed)
                 return;
 
             throw new ObjectDisposedException(nameof(Process));

@@ -34,7 +34,7 @@ namespace Mordor.Process.Internal
         }
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-        internal struct STARTUP_INFO
+        internal struct STARTUP_INFO : IDisposable
         {
             public uint cb;
             public char* lpReserved;
@@ -57,17 +57,36 @@ namespace Mordor.Process.Internal
 
             internal static uint SizeOf()
             {
-                        
+
                 return (uint) sizeof(STARTUP_INFO);
             }
 
             public override string ToString()
-            {              
+            {
                 return lpTitle->ToString();
+            }
+
+            public void Dispose()
+            {
+                CloseHandle(new IntPtr(hStdInput));
+                CloseHandle(new IntPtr(hStdOutput));
+                CloseHandle(new IntPtr(hStdError));
             }
         }
 
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern uint ResumeThread(SafeProcessHandle safeThreadHandle);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern SafeProcessHandle GetCurrentProcess();
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern uint GetCurrentProcessId();
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern SafeProcessHandle GetCurrentThread();
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        public static extern void GetStartupInfo(out STARTUP_INFO lpStartupInfo);
     }
 }
