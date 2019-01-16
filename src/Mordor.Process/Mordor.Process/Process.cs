@@ -110,7 +110,7 @@ namespace Mordor.Process
         public int Wait(TimeSpan timeout)
         {
 #if DEBUG
-            NativeHelpers.WaitOne(SafeProcessHandle, timeout);
+            WaitOne(SafeProcessHandle, timeout);
 #elif SAFEPROCESSHANDLE
             WaitHandle.WaitOne(timeout);
 #endif
@@ -183,7 +183,7 @@ namespace Mordor.Process
 
         public static void ResumeProcess(Process process)
         {
-            var result = NativeMethods.ResumeThread(process.SafeThreadHandle);
+            var result = ResumeThread(process.SafeThreadHandle);
 
             if (result == unchecked((uint) -1))
                 ThrowLastWin32Exception();

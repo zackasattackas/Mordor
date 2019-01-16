@@ -1,6 +1,6 @@
 ﻿namespace Mordor.Process.Internal
 {
-    internal enum WaitResult : int
+    internal enum WaitResult
     {
         Signaled = 0x0,
         Abandoned = 0x80,        

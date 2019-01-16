@@ -1,6 +1,6 @@
-﻿using Mordor.Process.Internal;
-using System;
+﻿using System;
 using System.IO;
+using Mordor.Process.Internal;
 using static Mordor.Process.Internal.NativeMethods;
 
 namespace Mordor.Process
@@ -92,7 +92,7 @@ namespace Mordor.Process
                     dwFillAttribute = 0,
                     dwFlags = _startupFlags,
                     wShowWindow = _swOptions,
-                    lpTitle = pTitle,
+                    lpTitle = pTitle
                 };
         }
 

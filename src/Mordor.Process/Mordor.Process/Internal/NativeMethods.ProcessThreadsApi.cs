@@ -34,7 +34,7 @@ namespace Mordor.Process.Internal
         }
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-        internal unsafe struct STARTUP_INFO
+        internal struct STARTUP_INFO
         {
             public uint cb;
             public char* lpReserved;

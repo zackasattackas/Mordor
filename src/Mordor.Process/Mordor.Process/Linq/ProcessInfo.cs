@@ -75,6 +75,21 @@ namespace Mordor.Process.Linq
             throw new NotImplementedException();
         }
 
+        public ProcessInfo Refresh()
+        {
+            var refresh = new ProcessInfo(Pid);
+
+            foreach (var property in typeof(ProcessInfo).GetProperties())
+            {
+                if (property.SetMethod is null || property.GetMethod is null)
+                    continue;
+
+                property.SetValue(this, property.GetValue(refresh));
+            }
+
+            return this;
+        }
+
         #endregion
     }
 }

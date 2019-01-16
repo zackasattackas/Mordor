@@ -1,6 +1,6 @@
 ﻿namespace Mordor.Process.Internal
 {
-    internal static unsafe partial class NativeMethods
+    internal static partial class NativeMethods
     {
         public const int MAX_COMMAND_LINE = short.MaxValue + 1;
         public const int MAX_PATH = 256;
