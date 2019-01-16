@@ -7,15 +7,21 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
 using Mordor.Process.Internal;
-using static Mordor.Process.Internal.NativeMethods;
+using Mordor.Process.Linq;
 using static Mordor.Process.Internal.NativeHelpers;
+using static Mordor.Process.Internal.NativeMethods;
 
 namespace Mordor.Process
 {
     public class Process : Component, ISafeDisposable
     {
+        #region Fields
+
         private int? _exitCode;
-        private CancellationToken _cancellation;
+        private readonly CancellationToken _cancellation;
+        private readonly ProcessStartup _startup;
+
+        #endregion
 
         #region Properties
 
@@ -47,14 +53,17 @@ namespace Mordor.Process
         #region Static properties
 
         public static ProcessFactory Factory => new ProcessFactory();
+        public static CimInstanceQuery<ProcessInfo> AllProcesses { get; }
 
         #endregion
 
         #region Ctor        
 
-        internal Process(PROCESS_INFORMATION info, CancellationToken cancellationToken = default)
+        internal Process(PROCESS_INFORMATION info, ProcessStartup startup, CancellationToken cancellationToken = default)
         {
             _cancellation = cancellationToken;
+            _startup = startup;
+
             Pid = info.Pid;
             SafeProcessHandle = new SafeProcessHandle(info.Process, true);
             SafeThreadHandle = new SafeProcessHandle(info.Thread, true);
@@ -87,24 +96,6 @@ namespace Mordor.Process
 
         #region Public methods
 
-        public ConsoleReader OpenStdIn()
-        {
-            ThrowIfDisposed();
-            throw new NotImplementedException();
-        }
-
-        public ConsoleWriter OpenStdOut()
-        {
-            ThrowIfDisposed();
-            throw new NotImplementedException();
-        }
-
-        public ConsoleWriter OpenStdError()
-        {
-            ThrowIfDisposed();
-            throw new NotImplementedException();
-        }
-
         /// <summary>
         /// Waits for the process to exit.
         /// </summary>
@@ -129,7 +120,9 @@ namespace Mordor.Process
 
         public TaskAwaiter<(Process Process, int ExitCode)> GetAwaiter()
         {
-            return Task.Run(() => (this, Wait())).GetAwaiter();
+            if ((_startup.CreationFlags & ProcessCreationFlags.Suspended) != 0)
+                ResumeProcess(this);
+            return Task.Run(() => (this, Wait()), _cancellation).GetAwaiter();
         }
 
         #endregion
@@ -145,6 +138,67 @@ namespace Mordor.Process
         {
             return NativeHelpers.WaitAny(timeout, processes.Select(p => p.SafeProcessHandle).Cast<SafeHandle>().ToArray());
         }
+
+        public static unsafe uint[] GetProcesses()
+        {
+            var buffer = new uint[1024];
+            var bytesNeeded = 0U;
+            uint count;
+
+            fixed (uint* pBuff = buffer)
+            {
+                if (!EnumProcesses(pBuff, (uint)(sizeof(uint) * buffer.Length), &bytesNeeded))
+                    ThrowLastWin32Exception();
+
+                count = bytesNeeded / sizeof(uint);
+            }
+
+            var processes = new uint[count];
+
+            for (var i = 0; i < count; i++)
+                processes[i] = buffer[i];
+
+            return processes;
+        }        
+
+        public static SafeProcessHandle OpenProcess(uint pid, ProcessAccess access, bool inherit)
+        {
+            return NativeMethods.OpenProcess(access, inherit, pid);
+        }
+
+        public static SafeProcessHandle[] OpenProcesses(uint[] pids, ProcessAccess access, bool inherit)
+        {
+            var processes = new SafeProcessHandle[pids.Length];
+
+            for (var i = 0; i < pids.Length; i++)
+                processes[i] = OpenProcess(pids[i], access, inherit);
+
+            return processes;
+        }
+
+        public static void TerminateProcess(uint pid)
+        {
+            throw new NotImplementedException();
+        }
+
+        public static void ResumeProcess(Process process)
+        {
+            var result = NativeMethods.ResumeThread(process.SafeThreadHandle);
+
+            if (result == unchecked((uint) -1))
+                ThrowLastWin32Exception();
+        }
+
+        //public static unsafe string GetProcessFileName(SafeProcessHandle handle)
+        //{
+        //    var fileName = stackalloc char[MAX_PATH];
+
+        //    if (!GetProcessInformation(handle, ProcessInfo.ImageFileName, (void*)fileName, sizeof(char) * MAX_PATH))
+        //        ThrowLastWin32Exception();
+
+        //    return new string(fileName);
+        //}
+
 
         #endregion
 

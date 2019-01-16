@@ -23,7 +23,7 @@ namespace Mordor.Process.Internal
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         public static extern bool CreateProcess(
             [In] string applicationName,
-            [In, MarshalAs(UnmanagedType.LPStr)] string commandLine,
+            [In] string commandLine,
             [In] SECURITY_ATTRIBUTES* processAttributes,
             [In] SECURITY_ATTRIBUTES* threadAttributes,
             [In] bool inherit,

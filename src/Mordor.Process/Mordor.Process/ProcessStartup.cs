@@ -20,8 +20,8 @@ namespace Mordor.Process
 
         #region Properties
 
-        public string[] CommandLine { get; set; }
-        public string CommandLineString => string.Join(" ", CommandLine);
+        public string FilePath { get; set; }
+        public string Arguments { get; set; }
 
         public DirectoryInfo WorkingDirectory
         {
@@ -41,9 +41,11 @@ namespace Mordor.Process
 
         #region Ctor
 
-        public ProcessStartup(params string[] commandLine)
+        public ProcessStartup(string filePath, string arguments = default, ProcessCreationFlags flags = ProcessCreationFlags.None)
         {
-            CommandLine = commandLine;
+            FilePath = filePath;
+            Arguments = arguments;
+            CreationFlags = flags;
         }
 
         #endregion

@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Mordor.Process;
+using Process = Mordor.Process.Process;
 
 namespace ProcessTests
 {
@@ -14,15 +16,15 @@ namespace ProcessTests
             {
                 try
                 {
-                    var exe = ProcessStartup.Escape(Assembly.GetExecutingAssembly().Location);
-                    var startup = new ProcessStartup(exe, "Hello world!")
-                    {
-                        CreationFlags = ProcessCreationFlags.NewConsole
-                    };
-                    var (process, exitCode) = await Process.Factory.Create(startup);
-                    var wow64 = ProcessManager.IsWow64Process(process.SafeProcessHandle);
+                    var file = Assembly.GetExecutingAssembly().Location;
+                    var flags = ProcessCreationFlags.NewConsole | ProcessCreationFlags.Suspended;                    
+                    var startup = new ProcessStartup(file, "Hello world!", flags);
+                    var process = Process.Factory.Create(startup);
+                    var info = Process.AllProcesses.First(p => p.Pid == process.Pid);
 
-                    Console.WriteLine($"Process {process.Pid} exit with code {exitCode}.");
+                    var (_, exitCode) = await process;
+
+                    Console.WriteLine($"Process {info.ModuleName} ({process.Pid}) exit with code {exitCode}.");                    
                 }
                 catch (Exception e)
                 {
@@ -30,8 +32,7 @@ namespace ProcessTests
                     throw;
                 }
 
-                Console.Write("\r\nPress any key to exit...");
-                Console.Read();
+                Debugger.Break();
             }
             else
             {

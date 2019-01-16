@@ -68,14 +68,6 @@ namespace Mordor.Process.Internal
         }
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        public static extern bool GetProcessInformation(SafeProcessHandle handle, ProcessInfo infoClass, void* info, uint size);
-    }
-
-    internal enum ProcessInfo : uint
-    {
-        Default = Basic,
-        Basic = 0,
-        Wow64 = 26,
-        ImageFileName = 27,
+        public static extern uint ResumeThread(SafeProcessHandle safeThreadHandle);
     }
 }
