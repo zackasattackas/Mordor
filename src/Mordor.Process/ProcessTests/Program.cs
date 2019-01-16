@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Linq;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Threading.Tasks;
 using Mordor.Process;
@@ -16,15 +17,8 @@ namespace ProcessTests
             {
                 try
                 {
-                    var file = Assembly.GetExecutingAssembly().Location;
-                    var flags = ProcessCreationFlags.NewConsole | ProcessCreationFlags.Suspended;                    
-                    var startup = new ProcessStartup(file, "Hello world!", flags);
-                    var process = Process.Factory.Create(startup);
-                    var info = Process.AllProcesses.First(p => p.Pid == process.Pid);
 
-                    var (_, exitCode) = await process;
-
-                    Console.WriteLine($"Process {info.ModuleName} ({process.Pid}) exit with code {exitCode}.");                    
+                    
                 }
                 catch (Exception e)
                 {

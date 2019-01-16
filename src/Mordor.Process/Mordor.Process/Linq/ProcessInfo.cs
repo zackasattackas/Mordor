@@ -90,6 +90,11 @@ namespace Mordor.Process.Linq
             return this;
         }
 
+        public override string ToString()
+        {
+            return ModuleName + " (Pid: " + Pid + ")";
+        }
+
         #endregion
     }
 }
