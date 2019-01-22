@@ -1,16 +1,36 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
 using System.Reflection;
 using Microsoft.Management.Infrastructure;
 using Microsoft.Management.Infrastructure.Options;
-using Mordor.Process.Linq;
 
 namespace Mordor.Process.Internal
 {
     internal static class CimHelpers
     {
-        public static IEnumerable<CimInstance> ExecuteWql(CimSession session, WqlQuery query, string namespaceName = "root\\cimv2")
+        public static CimSession LocalHost => CimSession.Create(".");
+        public const string DefaultNamespace = "root\\cimv2";
+
+        public static CimSession Connect(string computerName, NetworkCredential credentials)
         {
-            return session.QueryInstances(namespaceName, "WQL", query.ToString(), new CimOperationOptions());
+            throw new NotImplementedException();
+        }
+
+        public static IEnumerable<CimInstance> ExecuteWql(CimSession session, string query, string namespaceName = "root\\cimv2")
+        {
+            return session.QueryInstances(namespaceName, "WQL", query, new CimOperationOptions());
+        }
+
+        public static T BindCimInstance<T>(CimInstance instance)
+        {
+            return instance is null ? default : BindCimInstance(Activator.CreateInstance<T>(), instance);
+        }
+
+        public static IEnumerable<T> BindMany<T>(IEnumerable<CimInstance> instances)
+        {
+            return instances.Select(BindCimInstance<T>);
         }
 
         public static T BindCimInstance<T>(T binder, CimInstance instance)

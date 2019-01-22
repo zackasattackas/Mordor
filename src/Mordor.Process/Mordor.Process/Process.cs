@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -7,22 +8,22 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
 using Mordor.Process.Internal;
+using Mordor.Process.Internal.Win32;
 using Mordor.Process.Linq;
-using static Mordor.Process.Internal.NativeHelpers;
-using static Mordor.Process.Internal.NativeMethods;
+using static Mordor.Process.Internal.Win32.NativeHelpers;
+using static Mordor.Process.Internal.Win32.NativeMethods;
 
 namespace Mordor.Process
 {
-    public class Process : Component, IDisposable
+    public class Process : Component, IProcess<Process>
     {
         #region Fields
-
+        
         private int? _exitCode;
         private readonly CancellationToken _cancellation;
-        private readonly ProcessStartup _startup;
         private readonly uint _pid;
         private readonly SafeProcessHandle _safeProcessHandle;
-        private readonly SafeProcessHandle _safeThreadHandle;
+        private readonly SafeThreadHandle _safeThreadHandle;
         private bool _disposed;
 
         #endregion
@@ -38,7 +39,7 @@ namespace Mordor.Process
             }
         }
 
-        public SafeProcessHandle SafeThreadHandle
+        public SafeThreadHandle SafeThreadHandle
         {
             get
             {
@@ -82,34 +83,30 @@ namespace Mordor.Process
             }
         }
 
+        public int SuspendCount { get; private set; }
+
+        private bool IsSuspended => SuspendCount > 0;
+
         #endregion
 
         #region Static properties
 
-        [ThreadStatic] private static Process _currentProcess;
+        public static int CurrentPid => (int) GetCurrentProcessId();
 
-        [ThreadStatic] private static ProcessStartup _currentStartup;
-
-        public static Process CurrentProcess =>
-            _currentProcess ?? (_currentProcess = new Process(GetCurrentProcessId(), GetCurrentProcess(), GetCurrentThread()));
+        public static Process CurrentProcess => new Process(GetCurrentProcessId(), GetCurrentProcess(), GetCurrentThread());
 
         public static ProcessStartup CurrentProcessStartup
         {
             get
             {
-                if (_currentStartup is null)
-                {
-                    GetStartupInfo(out var startup);
-                    _currentStartup = new ProcessStartup(startup);
-                }
-
-                return _currentStartup;
+                GetStartupInfo(out var startup);
+                return new ProcessStartup(startup);
             }
         }
 
         public static ProcessFactory Factory => new ProcessFactory();
 
-        public static CimInstanceQuery<ProcessInfo> AllProcesses { get; }
+        //public static ProcessInfoQueryable AllProcesses { get; } = new ProcessInfoQueryable();
 
         #endregion
 
@@ -118,13 +115,12 @@ namespace Mordor.Process
         internal Process(PROCESS_INFORMATION info, ProcessStartup startup, CancellationToken cancellationToken = default)
         {
             _cancellation = cancellationToken;
-            _startup = startup;
             _pid = info.Pid;
             _safeProcessHandle = new SafeProcessHandle(info.Process, true);
-            _safeThreadHandle = new SafeProcessHandle(info.Thread, true);
+            _safeThreadHandle = new SafeThreadHandle(info.Thread, true);
         }
 
-        public Process(uint pid, SafeProcessHandle handle, SafeProcessHandle thread, CancellationToken cancellationToken = default)
+        internal Process(uint pid, SafeProcessHandle handle, SafeThreadHandle thread, CancellationToken cancellationToken = default)
 
         {
             _cancellation = cancellationToken;
@@ -168,7 +164,7 @@ namespace Mordor.Process
         {
             ThrowIfDisposed();
 #if DEBUG
-            WaitOne(SafeProcessHandle, timeout);
+            WaitForSafeHandle(SafeProcessHandle, timeout);
 #elif SAFEPROCESSHANDLE
             WaitHandle.WaitOne(timeout);
 #endif
@@ -176,12 +172,107 @@ namespace Mordor.Process
             return ExitCode;
         }
 
-        public TaskAwaiter<(Process Process, int ExitCode)> GetAwaiter()
+        /// <inheritdoc />
+        /// <summary>
+        /// Get a <see cref="T:System.Runtime.CompilerServices.TaskAwaiter`1" /> that waits for the process to exit or for the <see cref="T:System.Threading.CancellationToken" /> passed to the constructor is signaled.
+        /// </summary>
+        /// <returns></returns>
+        public TaskAwaiter<int> GetAwaiter()
         {
             ThrowIfDisposed();
-            if ((_startup.CreationFlags & ProcessCreationFlags.Suspended) != 0)
-                ResumeProcess(this);
-            return Task.Run(() => (this, Wait()), _cancellation).GetAwaiter();
+
+            if (IsSuspended)
+                Resume();
+
+            return Task.Run(Wait, _cancellation).GetAwaiter();
+        }
+
+        /// <summary>
+        /// Wait until the process has finished initialization and is waiting for user input. This function should be called before searching for any windows associated
+        /// with the process.
+        /// <para> See https://docs.microsoft.com/windows/desktop/api/winuser/nf-winuser-waitforinputidle for more info.</para>
+        /// </summary>
+        /// <param name="timeout"></param>
+        /// <returns></returns>
+        public void WaitForInputIdle(TimeSpan timeout)
+        {
+            ThrowIfDisposed();
+            var result = NativeMethods.WaitForInputIdle(SafeProcessHandle, (uint) timeout.Milliseconds);
+
+            switch (result)
+            {
+                case WaitResult.Signaled:
+                    break;
+                case WaitResult.TimedOut:
+                    throw new TimeoutException("The WaitForInputIdle function timed out.");
+                case WaitResult.Failed:
+                    ThrowLastWin32Exception();
+                    break;
+                default :
+                    throw new ArgumentOutOfRangeException(default, "Unxpected result from NativeMathod.WaitForInputIdle: " + (int) result);
+            }
+        }
+
+        public async Task TerminateAsync(uint exitCode)
+        {
+            await Task.Run(() => Terminate(exitCode), _cancellation);
+        }
+
+        public int Terminate() => Terminate(default);
+
+        public int Terminate(uint exitCode)
+        {
+            ThrowIfDisposed();
+            if (!TerminateProcess(SafeProcessHandle, exitCode))
+                ThrowLastWin32Exception();
+
+            return Wait();
+        }
+
+        /// <inheritdoc />
+        /// <summary>
+        /// Suspends the specified thread and increments the suspend count until <see cref="M:Mordor.Process.Process.Resume"/> is called.
+        /// <para>This method is intended for use by debuggers and should not be used for thread synchronization.</para>
+        /// </summary>
+        public void Suspend()
+        {
+            ThrowIfDisposed();
+
+            if (SuspendThread(SafeThreadHandle) == unchecked((uint)-1))
+                ThrowLastWin32Exception();            
+        }
+
+        /// <inheritdoc />
+        /// <summary>
+        /// Decrements the suspend count. If the <see cref="SuspendCount"/> is 1, the process' mail thread will resume execution. If the process was not
+        /// previously suspended, this method returns immediately.
+        /// </summary>
+        /// <returns></returns>
+        public Process Resume()
+        {
+            ThrowIfDisposed();
+
+            if (!IsSuspended)
+                return this;
+
+            if (ResumeThread(SafeThreadHandle) == unchecked((uint) -1))
+                ThrowLastWin32Exception();
+
+            var result = ResumeThread(SafeThreadHandle);
+
+            if (result == unchecked((uint) -1))
+                ThrowLastWin32Exception();
+            else
+                SuspendCount = result == 0 ? 0 : (int) result - 1;
+
+            return this;
+        }
+
+        public ProcessInfo GetProcessInfo()
+        {
+            ThrowIfDisposed();
+            throw new NotImplementedException();
+            //return AllProcesses.SingleOrDefault(p => p.Pid == Pid);
         }
 
         #endregion
@@ -198,6 +289,10 @@ namespace Mordor.Process
             return NativeHelpers.WaitAny(timeout, processes.Select(p => p.SafeProcessHandle).Cast<SafeHandle>().ToArray());
         }        
 
+        /// <summary>
+        /// This method wraps the Win32 EnumProcesses(uint*, uint, uint*) function to get the ID of all running processes.
+        /// </summary>
+        /// <returns></returns>
         public static unsafe uint[] GetProcesses()
         {
             var buffer = new uint[1024];
@@ -220,34 +315,34 @@ namespace Mordor.Process
             return processes;
         }        
 
-        public static SafeProcessHandle OpenProcess(uint pid, ProcessAccess access, bool inherit)
+        /// <summary>
+        /// Obtains a disposable handle to the process with the specified ID. The handle permissions can be configures with the <see cref="access"/> parameter.
+        /// </summary>
+        /// <param name="pid"></param>
+        /// <param name="access"></param>
+        /// <param name="inherit"></param>
+        /// <returns></returns>
+        public static SafeProcessHandle OpenProcess(uint pid, ProcessAccess access, bool inherit = true)
         {
             return NativeMethods.OpenProcess(access, inherit, pid);
         }
 
-        public static SafeProcessHandle[] OpenProcesses(uint[] pids, ProcessAccess access, bool inherit)
+        /// <summary>
+        /// Obtains a disposable handle to the specified processes. The handle permissions can be configures with the <see cref="access"/> parameter.
+        /// </summary>
+        /// <param name="pids"></param>
+        /// <param name="access"></param>
+        /// <param name="inherit"></param>
+        /// <returns></returns>
+        public static IEnumerable<SafeProcessHandle> OpenProcesses(uint[] pids, ProcessAccess access, bool inherit)
         {
-            var processes = new SafeProcessHandle[pids.Length];
-
-            for (var i = 0; i < pids.Length; i++)
-                processes[i] = OpenProcess(pids[i], access, inherit);
-
-            return processes;
+            return pids.Select(t => OpenProcess(t, access, inherit));
         }
 
-        public static void TerminateProcess(uint pid)
+        public static SafeTokenHandle OpenProcessToken(SafeProcessHandle process)
         {
             throw new NotImplementedException();
         }
-
-        public static void ResumeProcess(Process process)
-        {
-            var result = ResumeThread(process.SafeThreadHandle);
-
-            if (result == unchecked((uint) -1))
-                ThrowLastWin32Exception();
-        }
-
 
         #endregion
 

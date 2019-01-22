@@ -1,6 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
-using Microsoft.Management.Infrastructure;
 using Mordor.Process.Internal;
 using static Mordor.Process.Internal.CimHelpers;
 
@@ -54,12 +54,18 @@ namespace Mordor.Process.Linq
 
         #region Ctor
 
+        private ProcessInfo()
+        {
+            
+        }
+
         [Obsolete("Use the LINQ API to obtain process info")]
         public ProcessInfo(uint pid)
         {
-            using (var session = CimSession.Create("."))
-                BindCimInstance(this,
-                    ExecuteWql(session, new WqlQuery("Win32_Process").Where("ProcessId = " + pid)).First()                    );
+            //using (var session = CimSession.Create("."))
+            //    BindCimInstance(this,
+            //        ExecuteWql(session, new WqlQuery("Win32_Process").Where("ProcessId = " + pid)).First());
+            throw new NotImplementedException();
         }
 
         #endregion
@@ -93,6 +99,15 @@ namespace Mordor.Process.Linq
         public override string ToString()
         {
             return ModuleName + " (Pid: " + Pid + ")";
+        }
+
+        #endregion
+
+        #region Internal methods
+
+        internal static IEnumerable<ProcessInfo> EnumerateProcessInfos(string query)
+        {
+            return ExecuteWql(LocalHost, query).Select(BindCimInstance<ProcessInfo>);
         }
 
         #endregion

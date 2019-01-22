@@ -2,7 +2,8 @@
 using System.IO;
 using Microsoft.Win32.SafeHandles;
 using Mordor.Process.Internal;
-using static Mordor.Process.Internal.NativeMethods;
+using Mordor.Process.Internal.Win32;
+using static Mordor.Process.Internal.Win32.NativeMethods;
 
 namespace Mordor.Process
 {
@@ -10,7 +11,7 @@ namespace Mordor.Process
     {
         #region Fields
 
-        private STARTUP_INFO _native = new STARTUP_INFO();
+        private STARTUP_INFO _native;
         private StartupFlags _startupFlags;
         private ShowWindowOptions _swOptions;            
         private DirectoryInfo _workingDir;
@@ -27,24 +28,23 @@ namespace Mordor.Process
             get => _workingDir ?? DefaultWorkingDirectory.Value;
             set => _workingDir = value;
         }
-        public FileStream StdInput
+        private FileStream StdInput
         {
             get => GetStdStream(_native.hStdInput);
             set => SetStdHandle(value, ref _native.hStdInput);
         }
-        public FileStream StdOutput
+        private FileStream StdOutput
         {
             get => GetStdStream(_native.hStdOutput);
             set => SetStdHandle(value, ref _native.hStdOutput);
         }
-        public FileStream StdError
+        private FileStream StdError
         {
             get => GetStdStream(_native.hStdError);
             set => SetStdHandle(value, ref _native.hStdError);
         }
         public bool InheritHandles { get; set; }
         public unsafe void* Environment { get; set; }
-        public ProcessCreationFlags CreationFlags { get; set; }
         public string Title { get; set; }
 
         public static readonly Lazy<DirectoryInfo> DefaultWorkingDirectory =
@@ -59,11 +59,10 @@ namespace Mordor.Process
             _native = native;           
         }
 
-        public ProcessStartup(string filePath, string arguments = default, ProcessCreationFlags flags = ProcessCreationFlags.None)
+        public ProcessStartup(string filePath, string arguments = default)
         {
             FilePath = filePath;
             Arguments = arguments;
-            CreationFlags = flags;
         }
 
         #endregion
@@ -128,6 +127,7 @@ namespace Mordor.Process
             ThrowIfDisposed();
             CloseHandle(new IntPtr(handle));
             handle = (int)GetStdPtrValue(stream.SafeFileHandle);
+            _startupFlags |= StartupFlags.UseStdHandles;
         }
 
         private static long GetStdPtrValue(SafeFileHandle handle)

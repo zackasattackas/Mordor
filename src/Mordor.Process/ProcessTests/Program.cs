@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Linq;
-using System.Net.Sockets;
 using System.Reflection;
 using System.Threading.Tasks;
 using Mordor.Process;
@@ -17,8 +16,19 @@ namespace ProcessTests
             {
                 try
                 {
+                    var current = Process.CurrentProcess;
+                    //var startup = Process.CurrentProcessStartup;
+                    //var info = Process.AllProcesses.First(p => p.Pid == current.Pid);
 
-                    
+                    var startup = new ProcessStartup(
+                        Assembly.GetExecutingAssembly().Location,
+                        "Testing output redirection");
+
+                    var proc = Process.Factory.Create(startup);
+
+                    //var info = proc.GetProcessInfo();
+
+                    await proc;
                 }
                 catch (Exception e)
                 {
@@ -31,7 +41,7 @@ namespace ProcessTests
             else
             {
                 Console.WriteLine(Environment.CommandLine);
-                await Task.Delay(TimeSpan.FromSeconds(30));
+                await Task.Delay(TimeSpan.FromSeconds(5));
             }
 
             return 12345;
